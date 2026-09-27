@@ -5,5 +5,6 @@ dotenv.config();
 module.exports = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: Number(process.env.PORT) || 3000,
-  API_PREFIX: process.env.API_PREFIX || '/api/v1'
+  API_PREFIX: process.env.API_PREFIX || '/api/v1',
+  APP_URL: process.env.APP_URL || 'http://localhost:3000'
 };
