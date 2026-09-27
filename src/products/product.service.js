@@ -1,11 +1,15 @@
+const crypto = require('crypto');
 const { Prisma } = require('@prisma/client');
 const prisma = require('../config/database');
+const storageService = require('../services/storage.service');
 
 const categorySelect = {
   id: true,
   name: true,
   slug: true
 };
+
+const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const createProductError = (statusCode, code, message) => {
   const error = new Error(message);
@@ -120,7 +124,56 @@ const validateDisplayOrder = (displayOrder) => {
 };
 
 const productInclude = {
-  category: { select: categorySelect }
+  category: { select: categorySelect },
+  images: {
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      asset: {
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          size: true,
+          storageKey: true,
+          publicUrl: true
+        }
+      }
+    }
+  }
+};
+
+const buildImageUrl = (asset) => asset?.publicUrl || storageService.getFileUrl({ key: asset?.storageKey });
+
+const serializeProductImageRecord = (productImage) => {
+  const asset = productImage.asset;
+  const url = buildImageUrl(asset);
+
+  return {
+    id: productImage.id,
+    productId: productImage.productId,
+    asset: {
+      id: asset.id,
+      fileName: asset.fileName,
+      mimeType: asset.mimeType,
+      size: asset.size,
+      url
+    },
+    altText: productImage.altText,
+    displayOrder: productImage.displayOrder,
+    isPrimary: productImage.isPrimary
+  };
+};
+
+const serializeProductImageSummary = (productImage) => {
+  const asset = productImage.asset;
+
+  return {
+    id: productImage.id,
+    url: buildImageUrl(asset),
+    altText: productImage.altText,
+    displayOrder: productImage.displayOrder,
+    isPrimary: productImage.isPrimary
+  };
 };
 
 const serializeProduct = (product, includeDescription = true) => {
@@ -143,6 +196,10 @@ const serializeProduct = (product, includeDescription = true) => {
     publishedAt: product.publishedAt
   };
 
+  if (product.images) {
+    response.images = product.images.map((image) => serializeProductImageSummary(image));
+  }
+
   return response;
 };
 
@@ -152,6 +209,56 @@ const handlePrismaError = (error) => {
   }
 
   throw error;
+};
+
+const validateImageFile = (file) => {
+  const maxImageSize = Number(process.env.MAX_IMAGE_SIZE || 5242880);
+
+  if (!file || !file.buffer || !file.mimetype) {
+    throw createProductError(400, 'INVALID_IMAGE', 'Only JPEG, PNG and WebP images up to 5 MB are supported');
+  }
+
+  if (!allowedMimeTypes.has(file.mimetype)) {
+    throw createProductError(400, 'INVALID_IMAGE', 'Only JPEG, PNG and WebP images up to 5 MB are supported');
+  }
+
+  if (!Number.isFinite(maxImageSize) || maxImageSize <= 0 || Number(file.size) > maxImageSize) {
+    throw createProductError(400, 'INVALID_IMAGE', 'Only JPEG, PNG and WebP images up to 5 MB are supported');
+  }
+
+  return file;
+};
+
+const sanitizeFileName = (fileName) => {
+  const base = (fileName || 'product-image')
+    .replace(/\\/g, '/')
+    .split('/')
+    .pop()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[.-]+|[.-]+$/g, '')
+    .slice(0, 120);
+
+  return base || 'product-image';
+};
+
+const generateStorageKey = (productId, fileName) => {
+  const uniqueId = crypto.randomUUID().split('-')[0];
+  const safeFileName = sanitizeFileName(fileName);
+  return `products/${productId}/${uniqueId}-${safeFileName}`;
+};
+
+const ensureProductExists = async (productId, transaction = prisma) => {
+  const product = await transaction.product.findUnique({
+    where: { id: productId },
+    select: { id: true }
+  });
+
+  if (!product) {
+    throw createProductError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  }
+
+  return product;
 };
 
 const createProduct = async (input = {}) => {
@@ -320,18 +427,182 @@ const updateProduct = async (id, input = {}) => {
   }
 };
 
+const uploadProductImage = async (productId, input = {}) => {
+  validateProductId(productId);
+  const file = validateImageFile(input.file);
+  await ensureProductExists(productId);
+
+  const storageKey = generateStorageKey(productId, file.originalname || 'product-image');
+  const publicUrl = storageService.getFileUrl({ key: storageKey });
+
+  try {
+    await storageService.uploadFile({
+      key: storageKey,
+      body: file.buffer,
+      contentType: file.mimetype
+    });
+  } catch (error) {
+    throw error;
+  }
+
+  const assetData = {
+    fileName: file.originalname || 'product-image',
+    mimeType: file.mimetype,
+    size: Number(file.size),
+    storageKey,
+    publicUrl
+  };
+
+  const requestedPrimary = Boolean(input.isPrimary);
+  const displayOrder = Number.isInteger(input.displayOrder) ? input.displayOrder : 0;
+  const altText = input.altText === undefined || input.altText === null ? null : String(input.altText).trim() || null;
+
+  const result = await prisma.$transaction(async (transaction) => {
+    const existingImageCount = await transaction.productImage.count({ where: { productId } });
+    const shouldBePrimary = requestedPrimary || existingImageCount === 0;
+
+    if (shouldBePrimary) {
+      await transaction.productImage.updateMany({
+        where: { productId, isPrimary: true },
+        data: { isPrimary: false }
+      });
+    }
+
+    const asset = await transaction.asset.create({ data: assetData });
+    const productImage = await transaction.productImage.create({
+      data: {
+        productId,
+        assetId: asset.id,
+        altText,
+        displayOrder,
+        isPrimary: shouldBePrimary
+      },
+      include: {
+        asset: {
+          select: {
+            id: true,
+            fileName: true,
+            mimeType: true,
+            size: true,
+            storageKey: true,
+            publicUrl: true
+          }
+        }
+      }
+    });
+
+    return productImage;
+  });
+
+  return serializeProductImageRecord(result);
+};
+
+const getProductImages = async (productId) => {
+  validateProductId(productId);
+  await ensureProductExists(productId);
+
+  const productImages = await prisma.productImage.findMany({
+    where: { productId },
+    include: {
+      asset: {
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          size: true,
+          storageKey: true,
+          publicUrl: true
+        }
+      }
+    },
+    orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }]
+  });
+
+  return {
+    data: productImages.map((productImage) => serializeProductImageRecord(productImage))
+  };
+};
+
+const deleteProductImage = async (productId, imageId) => {
+  validateProductId(productId);
+  if (!isUuid(imageId)) {
+    throw createProductError(400, 'INVALID_PRODUCT_IMAGE_ID', 'Invalid product image ID');
+  }
+
+  const productImage = await prisma.productImage.findUnique({
+    where: { id: imageId },
+    include: { asset: true }
+  });
+
+  if (!productImage || productImage.productId !== productId) {
+    throw createProductError(404, 'PRODUCT_IMAGE_NOT_FOUND', 'Product image not found');
+  }
+
+  await storageService.deleteFile({ key: productImage.asset.storageKey });
+
+  await prisma.$transaction(async (transaction) => {
+    const currentImage = await transaction.productImage.findUnique({
+      where: { id: imageId },
+      include: { asset: true }
+    });
+
+    if (!currentImage) {
+      throw createProductError(404, 'PRODUCT_IMAGE_NOT_FOUND', 'Product image not found');
+    }
+
+    const wasPrimary = currentImage.isPrimary;
+
+    await transaction.productImage.delete({ where: { id: imageId } });
+
+    if (wasPrimary) {
+      const nextPrimary = await transaction.productImage.findFirst({
+        where: { productId },
+        orderBy: [{ displayOrder: 'asc' }, { createdAt: 'asc' }],
+        select: { id: true }
+      });
+
+      if (nextPrimary) {
+        await transaction.productImage.update({
+          where: { id: nextPrimary.id },
+          data: { isPrimary: true }
+        });
+      }
+    }
+
+    await transaction.asset.delete({ where: { id: currentImage.assetId } });
+  });
+};
+
 const deleteProduct = async (id) => {
   validateProductId(id);
 
-  try {
-    await prisma.product.delete({ where: { id } });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      throw createProductError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
+  const product = await prisma.product.findUnique({
+    where: { id },
+    include: {
+      images: {
+        include: { asset: true }
+      }
     }
+  });
 
-    throw error;
+  if (!product) {
+    throw createProductError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
   }
+
+  const assetKeys = product.images.map((image) => image.asset.storageKey).filter(Boolean);
+  for (const key of assetKeys) {
+    await storageService.deleteFile({ key });
+  }
+
+  const assetIds = product.images.map((image) => image.assetId);
+
+  await prisma.$transaction(async (transaction) => {
+    await transaction.productImage.deleteMany({ where: { productId: id } });
+    if (assetIds.length > 0) {
+      await transaction.asset.deleteMany({ where: { id: { in: assetIds } } });
+    }
+    await transaction.product.delete({ where: { id } });
+  });
 };
 
 module.exports = {
@@ -339,5 +610,8 @@ module.exports = {
   getProducts,
   getProductById,
   updateProduct,
+  uploadProductImage,
+  getProductImages,
+  deleteProductImage,
   deleteProduct
 };

@@ -7,22 +7,15 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum ProductStatus {
-  DRAFT
-  PUBLISHED
-  UNPUBLISHED
-  ARCHIVED
-}
-
 model Category {
-  id           String   @id @default(uuid()) @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
   name         String
-  slug         String   @unique
+  slug         String    @unique
   description  String?
-  displayOrder Int      @default(0)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  displayOrder Int       @default(0)
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   products     Product[]
 
   @@index([isActive])
@@ -31,23 +24,24 @@ model Category {
 }
 
 model Product {
-  id           String        @id @default(uuid()) @db.Uuid
-  slug         String        @unique
+  id           String         @id @default(uuid()) @db.Uuid
+  slug         String         @unique
   title        String
   subtitle     String?
   description  Json
-  price        Decimal       @db.Decimal(10, 2)
-  currency     String        @default("INR")
+  price        Decimal        @db.Decimal(10, 2)
+  currency     String         @default("INR")
   packageSize  String?
-  status       ProductStatus @default(DRAFT)
-  isFeatured   Boolean       @default(false)
-  isAvailable  Boolean       @default(true)
-  displayOrder Int           @default(0)
-  categoryId   String        @db.Uuid
-  category     Category      @relation(fields: [categoryId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  status       ProductStatus  @default(DRAFT)
+  isFeatured   Boolean        @default(false)
+  isAvailable  Boolean        @default(true)
+  displayOrder Int            @default(0)
+  categoryId   String         @db.Uuid
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
   publishedAt  DateTime?
+  images       ProductImage[]
+  category     Category       @relation(fields: [categoryId], references: [id])
 
   @@index([categoryId])
   @@index([status])
@@ -56,4 +50,45 @@ model Product {
   @@index([displayOrder])
   @@index([status, isAvailable, displayOrder])
   @@map("products")
+}
+
+model Asset {
+  id            String         @id @default(uuid()) @db.Uuid
+  fileName      String
+  mimeType      String
+  size          Int
+  storageKey    String         @unique
+  publicUrl     String?
+  width         Int?
+  height        Int?
+  altText       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  productImages ProductImage[]
+
+  @@map("assets")
+}
+
+model ProductImage {
+  id           String   @id @default(uuid()) @db.Uuid
+  productId    String   @db.Uuid
+  assetId      String   @db.Uuid
+  altText      String?
+  displayOrder Int      @default(0)
+  isPrimary    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, displayOrder])
+  @@index([productId, isPrimary])
+  @@map("product_images")
+}
+
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  UNPUBLISHED
+  ARCHIVED
 }

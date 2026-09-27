@@ -11,11 +11,13 @@
     "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.873.0",
+    "@prisma/client": "6.19.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "@prisma/client": "6.19.0",
     "helmet": "^8.0.0",
+    "multer": "^2.0.0",
     "prisma": "6.19.0"
   },
   "devDependencies": {
