@@ -378,6 +378,7 @@ const getProducts = async (pagination = {}) => {
   ]);
 
   const serializedProducts = products.map((product) => serializeProduct(product, false));
+  let imageIndex = 0;
 
   return {
     data: onlyImages
@@ -386,12 +387,13 @@ const getProducts = async (pagination = {}) => {
         title,
         subtitle,
         images: images.map((image) => {
-          const layoutType = Math.floor(Math.random() * 3);
+          const position = imageIndex % 8;
+          imageIndex += 1;
 
           return {
             ...image,
-            tall: layoutType === 0,
-            wide: layoutType === 1
+            tall: position === 0 || position === 5,
+            wide: position === 3 || position === 4
           };
         })
       }))

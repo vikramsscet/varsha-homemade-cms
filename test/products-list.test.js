@@ -120,17 +120,7 @@ test('onlyImages=false preserves the existing product response', async () => {
 });
 
 test('onlyImages=true returns only gallery fields and image summaries', async () => {
-  const originalRandom = Math.random;
-  const randomValues = [0.1, 0.5, 0.9];
-  let randomCallCount = 0;
-  Math.random = () => randomValues[randomCallCount++];
-
-  let result;
-  try {
-    result = await productService.getProducts({ onlyImages: 'true' });
-  } finally {
-    Math.random = originalRandom;
-  }
+  const result = await productService.getProducts({ onlyImages: 'true' });
 
   assert.deepEqual(Object.keys(result.data[0]), ['id', 'title', 'subtitle', 'images']);
   assert.deepEqual(result.data[0].images[0], {
@@ -149,7 +139,7 @@ test('onlyImages=true returns only gallery fields and image summaries', async ()
     displayOrder: 2,
     isPrimary: false,
     tall: false,
-    wide: true
+    wide: false
   });
   assert.deepEqual(result.data[0].images[2], {
     id: 'image-3',
@@ -160,7 +150,6 @@ test('onlyImages=true returns only gallery fields and image summaries', async ()
     tall: false,
     wide: false
   });
-  assert.equal(randomCallCount, 3);
   for (const image of result.data[0].images) {
     assert.equal(typeof image.tall, 'boolean');
     assert.equal(typeof image.wide, 'boolean');
@@ -170,6 +159,34 @@ test('onlyImages=true returns only gallery fields and image summaries', async ()
   assert.deepEqual(findManyArguments.include.images.orderBy, [
     { displayOrder: 'asc' },
     { createdAt: 'asc' }
+  ]);
+});
+
+test('onlyImages assigns the repeating layout across product boundaries', async () => {
+  const allImages = Array.from({ length: 8 }, (_, index) => ({
+    ...products[0].images[index % products[0].images.length],
+    id: `gallery-image-${index + 1}`,
+    displayOrder: index + 1
+  }));
+  prisma.product.findMany = async () => [
+    { ...products[0], images: allImages.slice(0, 3) },
+    { ...products[0], id: 'product-2', title: 'Second product', images: allImages.slice(3) }
+  ];
+
+  const result = await productService.getProducts({ onlyImages: 'true' });
+  const layout = result.data.flatMap(({ images }) =>
+    images.map(({ tall, wide }) => ({ tall, wide }))
+  );
+
+  assert.deepEqual(layout, [
+    { tall: true, wide: false },
+    { tall: false, wide: false },
+    { tall: false, wide: false },
+    { tall: false, wide: true },
+    { tall: false, wide: true },
+    { tall: true, wide: false },
+    { tall: false, wide: false },
+    { tall: false, wide: false }
   ]);
 });
 
