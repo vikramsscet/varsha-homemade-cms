@@ -14,7 +14,8 @@ const options = {
       { name: 'Categories' },
       { name: 'Products' },
       { name: 'Product Images' },
-      { name: 'Health' }
+      { name: 'Health' },
+      { name: 'OAuth' }
     ],
     components: {
       schemas: {

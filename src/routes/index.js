@@ -3,6 +3,7 @@ const { API_PREFIX } = require('../config/env');
 const { getHealth } = require('../controllers/health.controller');
 const categoryRoutes = require('../categories/category.routes');
 const productRoutes = require('../products/product.routes');
+const oauthRoutes = require('../oauth/oauth.routes');
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ const router = express.Router();
  *       503: { description: Database unavailable }
  */
 router.get(`${API_PREFIX}/health`, getHealth);
+router.use('/oauth', oauthRoutes);
 router.use(`${API_PREFIX}/categories`, categoryRoutes);
 router.use(`${API_PREFIX}/products`, productRoutes);
 
