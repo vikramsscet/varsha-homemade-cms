@@ -28,7 +28,7 @@ const router = express.Router();
  *       503: { description: Database unavailable }
  */
 router.get(`${API_PREFIX}/health`, getHealth);
-router.use('/oauth', oauthRoutes);
+router.use(`${API_PREFIX}/oauth`, oauthRoutes);
 router.use(`${API_PREFIX}/categories`, categoryRoutes);
 router.use(`${API_PREFIX}/products`, productRoutes);
 
