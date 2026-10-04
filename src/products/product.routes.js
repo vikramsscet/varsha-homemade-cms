@@ -43,15 +43,24 @@ const upload = multer({ storage: multer.memoryStorage() });
  *     parameters:
  *       - { in: query, name: page, schema: { type: integer, minimum: 1, default: 1 } }
  *       - { in: query, name: limit, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+ *       - { in: query, name: isAvailable, schema: { type: boolean, description: 'Filter products by availability' } }
+ *       - { in: query, name: isPublished, schema: { type: boolean, description: 'Filter products by published status (status = PUBLISHED)' } }
+ *       - { in: query, name: isFeatured, schema: { type: boolean, description: 'Filter products by featured status' } }
+ *       - { in: query, name: onlyImages, schema: { type: boolean, default: false, description: 'Return only id, title, subtitle, and images' } }
  *     responses:
  *       200:
- *         description: Paginated products
+ *         description: Paginated products, or gallery fields when onlyImages=true
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 data: { type: array, items: { $ref: '#/components/schemas/Product' } }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     oneOf:
+ *                       - { $ref: '#/components/schemas/Product' }
+ *                       - { $ref: '#/components/schemas/GalleryProduct' }
  *                 pagination: { $ref: '#/components/schemas/Pagination' }
  *       400: { $ref: '#/components/responses/BadRequest' }
  */

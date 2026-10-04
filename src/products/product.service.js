@@ -318,13 +318,58 @@ const parsePagination = ({ page, limit }) => {
   };
 };
 
+const parseOptionalBoolean = (value, fieldName) => {
+  if (value === undefined || value === null || value === '') {
+    return undefined;
+  }
+
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true') {
+    return true;
+  }
+
+  if (normalized === 'false') {
+    return false;
+  }
+
+  throw createProductError(400, 'INVALID_PRODUCT', `${fieldName} must be either true or false`);
+};
+
+const parseProductFilters = (query = {}) => {
+  const filters = {};
+  const isAvailable = parseOptionalBoolean(query.isAvailable, 'isAvailable');
+  const isPublished = parseOptionalBoolean(query.isPublished, 'isPublished');
+  const isFeatured = parseOptionalBoolean(query.isFeatured, 'isFeatured');
+
+  if (isAvailable !== undefined) {
+    filters.isAvailable = isAvailable;
+  }
+
+  if (isPublished !== undefined) {
+    filters.status = isPublished ? 'PUBLISHED' : { not: 'PUBLISHED' };
+  }
+
+  if (isFeatured !== undefined) {
+    filters.isFeatured = isFeatured;
+  }
+
+  return filters;
+};
+
 const getProducts = async (pagination = {}) => {
   const { page, limit } = parsePagination(pagination);
   const skip = (page - 1) * limit;
+  const filters = parseProductFilters(pagination);
+  const onlyImages = parseOptionalBoolean(pagination.onlyImages, 'onlyImages') === true;
 
   const [total, products] = await prisma.$transaction([
-    prisma.product.count(),
+    prisma.product.count({ where: filters }),
     prisma.product.findMany({
+      where: filters,
       skip,
       take: limit,
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
@@ -332,8 +377,25 @@ const getProducts = async (pagination = {}) => {
     })
   ]);
 
+  const serializedProducts = products.map((product) => serializeProduct(product, false));
+
   return {
-    data: products.map((product) => serializeProduct(product, false)),
+    data: onlyImages
+      ? serializedProducts.map(({ id, title, subtitle, images }) => ({
+        id,
+        title,
+        subtitle,
+        images: images.map((image) => {
+          const layoutType = Math.floor(Math.random() * 3);
+
+          return {
+            ...image,
+            tall: layoutType === 0,
+            wide: layoutType === 1
+          };
+        })
+      }))
+      : serializedProducts,
     pagination: {
       page,
       limit,

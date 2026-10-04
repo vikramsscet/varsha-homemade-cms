@@ -83,6 +83,19 @@ const options = {
             isPrimary: { type: 'boolean' }
           }
         },
+        GalleryImage: {
+          allOf: [
+            { $ref: '#/components/schemas/ProductImageSummary' },
+            {
+              type: 'object',
+              required: ['tall', 'wide'],
+              properties: {
+                tall: { type: 'boolean' },
+                wide: { type: 'boolean' }
+              }
+            }
+          ]
+        },
         Product: {
           type: 'object',
           properties: {
@@ -103,6 +116,16 @@ const options = {
             createdAt: { type: 'string', format: 'date-time' },
             updatedAt: { type: 'string', format: 'date-time' },
             publishedAt: { type: 'string', format: 'date-time', nullable: true }
+          }
+        },
+        GalleryProduct: {
+          type: 'object',
+          required: ['id', 'title', 'images'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            title: { type: 'string' },
+            subtitle: { type: 'string', nullable: true },
+            images: { type: 'array', items: { $ref: '#/components/schemas/GalleryImage' } }
           }
         },
         Pagination: {
