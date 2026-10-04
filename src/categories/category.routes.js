@@ -1,5 +1,7 @@
 const express = require('express');
 const categoryController = require('./category.controller');
+const { authenticateOAuthToken } = require('../middlewares/oauth-auth.middleware');
+const { requireScope } = require('../middlewares/oauth-scope.middleware');
 
 const router = express.Router();
 
@@ -9,6 +11,8 @@ const router = express.Router();
  *   post:
  *     tags: [Categories]
  *     summary: Create a category
+ *     security:
+ *       - OAuth2: [categories:write]
  *     requestBody:
  *       required: true
  *       content:
@@ -25,6 +29,8 @@ const router = express.Router();
  *     responses:
  *       201: { description: Category created, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } }
  *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/InsufficientScope' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *   get:
  *     tags: [Categories]
@@ -44,7 +50,7 @@ const router = express.Router();
  *                 data: { type: array, items: { $ref: '#/components/schemas/Category' } }
  *       400: { $ref: '#/components/responses/BadRequest' }
  */
-router.post('/', categoryController.createCategory);
+router.post('/', authenticateOAuthToken, requireScope('categories:write'), categoryController.createCategory);
 router.get('/', categoryController.getCategories);
 
 /**
@@ -53,15 +59,21 @@ router.get('/', categoryController.getCategories);
  *   get:
  *     tags: [Categories]
  *     summary: Get a category
+ *     security:
+ *       - OAuth2: [categories:read]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
  *       200: { description: Category, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } }
  *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/InsufficientScope' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *   patch:
  *     tags: [Categories]
  *     summary: Partially update a category
+ *     security:
+ *       - OAuth2: [categories:write]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     requestBody:
@@ -79,20 +91,26 @@ router.get('/', categoryController.getCategories);
  *     responses:
  *       200: { description: Category updated, content: { application/json: { schema: { $ref: '#/components/schemas/Category' } } } }
  *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/InsufficientScope' }
  *       404: { $ref: '#/components/responses/NotFound' }
  *       409: { $ref: '#/components/responses/Conflict' }
  *   delete:
  *     tags: [Categories]
  *     summary: Delete a category
+ *     security:
+ *       - OAuth2: [categories:delete]
  *     parameters:
  *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
  *     responses:
  *       204: { description: Category deleted }
  *       400: { $ref: '#/components/responses/BadRequest' }
+ *       401: { $ref: '#/components/responses/Unauthorized' }
+ *       403: { $ref: '#/components/responses/InsufficientScope' }
  *       404: { $ref: '#/components/responses/NotFound' }
  */
 router.get('/:id', categoryController.getCategoryById);
-router.patch('/:id', categoryController.updateCategory);
-router.delete('/:id', categoryController.deleteCategory);
+router.patch('/:id', authenticateOAuthToken, requireScope('categories:write'), categoryController.updateCategory);
+router.delete('/:id', authenticateOAuthToken, requireScope('categories:delete'), categoryController.deleteCategory);
 
 module.exports = router;

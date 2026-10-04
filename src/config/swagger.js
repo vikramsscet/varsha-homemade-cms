@@ -18,6 +18,24 @@ const options = {
       { name: 'OAuth' }
     ],
     components: {
+      securitySchemes: {
+        OAuth2: {
+          type: 'oauth2',
+          flows: {
+            clientCredentials: {
+              tokenUrl: '/oauth/token',
+              scopes: {
+                'products:read': 'Read products and product images',
+                'products:write': 'Create or update products and upload product images',
+                'products:delete': 'Delete products and product images',
+                'categories:read': 'Read categories',
+                'categories:write': 'Create or update categories',
+                'categories:delete': 'Delete categories'
+              }
+            }
+          }
+        }
+      },
       schemas: {
         Error: {
           type: 'object',
@@ -141,6 +159,34 @@ const options = {
       },
       responses: {
         BadRequest: { description: 'Bad request', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
+        Unauthorized: {
+          description: 'Bearer token is missing, invalid, or expired',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  statusCode: { type: 'integer', example: 401 },
+                  message: { type: 'string', example: 'Unauthorized' }
+                }
+              }
+            }
+          }
+        },
+        InsufficientScope: {
+          description: 'The access token does not include the required scope',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  error: { type: 'string', example: 'insufficient_scope' },
+                  error_description: { type: 'string', example: 'Required scope is missing' }
+                }
+              }
+            }
+          }
+        },
         NotFound: { description: 'Resource not found', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         Conflict: { description: 'Conflict', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } },
         ServerError: { description: 'Internal server error', content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } }

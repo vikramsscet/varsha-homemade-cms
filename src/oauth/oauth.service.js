@@ -17,7 +17,6 @@ const secureEqual = (provided, expected) => {
 };
 
 const issueClientCredentialsToken = ({ clientId, clientSecret } = {}) => {
-    console.log('issueClientCredentialsToken called with:', { clientId, clientSecret, CMS_OAUTH_CLIENT_ID, CMS_OAUTH_CLIENT_SECRET });    
   const clientIdMatches = secureEqual(clientId, CMS_OAUTH_CLIENT_ID);
   const clientSecretMatches = secureEqual(clientSecret, CMS_OAUTH_CLIENT_SECRET);
 

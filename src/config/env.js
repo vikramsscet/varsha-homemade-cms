@@ -13,5 +13,6 @@ module.exports = {
   JWT_AUDIENCE: process.env.JWT_AUDIENCE,
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
   JWT_PRIVATE_KEY: process.env.JWT_PRIVATE_KEY,
+  JWT_PUBLIC_KEY: process.env.JWT_PUBLIC_KEY,
   CMS_OAUTH_SCOPES: process.env.CMS_OAUTH_SCOPES
 };

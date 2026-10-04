@@ -65,12 +65,13 @@ const generateAccessToken = ({ clientId, scope } = {}) => {
 
 const validateAccessToken = (token) => {
   const config = getJwtConfiguration();
+  
   const payload = jwt.verify(token, config.publicKey, {
     algorithms: ['RS256'],
     issuer: config.issuer,
     audience: config.audience
   });
-
+console.log("------------",payload);
   if (
     !payload ||
     typeof payload !== 'object' ||
