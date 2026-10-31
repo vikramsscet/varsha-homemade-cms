@@ -14,5 +14,7 @@ module.exports = {
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN,
   JWT_PRIVATE_KEY: process.env.JWT_PRIVATE_KEY,
   JWT_PUBLIC_KEY: process.env.JWT_PUBLIC_KEY,
-  CMS_OAUTH_SCOPES: process.env.CMS_OAUTH_SCOPES
+  CMS_OAUTH_SCOPES: process.env.CMS_OAUTH_SCOPES,
+  CART_MAX_ITEM_QUANTITY: Number(process.env.CART_MAX_ITEM_QUANTITY) || 99,
+  CART_MAX_DISTINCT_ITEMS: Number(process.env.CART_MAX_DISTINCT_ITEMS) || 50
 };

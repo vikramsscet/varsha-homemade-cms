@@ -11,7 +11,8 @@ const issueToken = (req, res, next) => {
   try {
     const accessToken = oauthService.issueClientCredentialsToken({
       clientId: req.body.client_id,
-      clientSecret: req.body.client_secret
+      clientSecret: req.body.client_secret,
+      scope: req.body.scope
     });
 
     if (!accessToken) {
@@ -27,6 +28,12 @@ const issueToken = (req, res, next) => {
       expires_in: 900
     });
   } catch (error) {
+    if (error.code === 'INVALID_SCOPE') {
+      return res.status(400).json({
+        error: 'invalid_scope',
+        error_description: error.message
+      });
+    }
     return next(error);
   }
 };

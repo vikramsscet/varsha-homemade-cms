@@ -84,5 +84,5 @@ test('documents required scopes and leaves catalog collections public', () => {
 
   assert.equal(swaggerSpec.paths['/api/v1/products'].get.security, undefined);
   assert.equal(swaggerSpec.paths['/api/v1/categories'].get.security, undefined);
-  assert.equal(swaggerSpec.paths['/oauth/token'].post.security, undefined);
+  assert.equal(swaggerSpec.paths['/api/v1/oauth/token'].post.security, undefined);
 });

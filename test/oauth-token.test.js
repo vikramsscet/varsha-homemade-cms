@@ -29,7 +29,7 @@ after(async () => {
   });
 });
 
-const requestToken = (fields) => fetch(`${baseUrl}/oauth/token`, {
+const requestToken = (fields) => fetch(`${baseUrl}/api/v1/oauth/token`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   body: new URLSearchParams(fields)
@@ -87,4 +87,139 @@ test('rejects unsupported and missing grant types', async () => {
   assert.deepEqual(await unsupportedResponse.json(), expected);
   assert.equal(missingResponse.status, 400);
   assert.deepEqual(await missingResponse.json(), expected);
+});
+test('rejects missing client ID or client secret as invalid_client', async () => {
+  const expected = {
+    error: 'invalid_client',
+    error_description: 'Invalid client credentials'
+  };
+  const missingId = await requestToken({
+    grant_type: 'client_credentials',
+    client_secret: 'test-client-secret'
+  });
+  const missingSecret = await requestToken({
+    grant_type: 'client_credentials',
+    client_id: 'cms-admin-test'
+  });
+  const emptyBoth = await requestToken({
+    grant_type: 'client_credentials',
+    client_id: '',
+    client_secret: ''
+  });
+
+  for (const response of [missingId, missingSecret, emptyBoth]) {
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), expected);
+  }
+});
+
+test('does not read credentials from the Authorization header', async () => {
+  const basic = Buffer.from('cms-admin-test:test-client-secret').toString('base64');
+  const response = await fetch(`${baseUrl}/api/v1/oauth/token`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${basic}`
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials' })
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, 'invalid_client');
+});
+
+test('accepts credentials in a JSON body', async () => {
+  const response = await fetch(`${baseUrl}/api/v1/oauth/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'client_credentials',
+      client_id: 'cms-admin-test',
+      client_secret: 'test-client-secret'
+    })
+  });
+
+  assert.equal(response.status, 200);
+});
+
+test('issues a token narrowed to the requested scope', async () => {
+  const response = await requestToken({
+    grant_type: 'client_credentials',
+    client_id: 'cms-admin-test',
+    client_secret: 'test-client-secret',
+    scope: 'products:write'
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(jwtService.validateAccessToken(body.access_token).scope, 'products:write');
+});
+
+test('rejects unknown, empty, or widening scopes with invalid_scope', async () => {
+  for (const scope of ['products:read unknown:scope', 'users:delete', ' ', '']) {
+    const response = await requestToken({
+      grant_type: 'client_credentials',
+      client_id: 'cms-admin-test',
+      client_secret: 'test-client-secret',
+      scope
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 400, `scope ${JSON.stringify(scope)}`);
+    assert.equal(body.error, 'invalid_scope');
+  }
+});
+
+test('checks credentials before scope so bad credentials never reveal scope validity', async () => {
+  const response = await requestToken({
+    grant_type: 'client_credentials',
+    client_id: 'cms-admin-test',
+    client_secret: 'wrong-secret',
+    scope: 'unknown:scope'
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, 'invalid_client');
+});
+
+test('Swagger UI interceptor moves Basic credentials into the token request body', () => {
+  const { swaggerOptions } = require('../src/config/swagger-ui');
+  const intercept = swaggerOptions.requestInterceptor;
+  const basic = Buffer.from('cms-admin:s3cr3t:with:colons').toString('base64');
+  // Swagger UI issues this request with a lowercase method.
+  const request = {
+    method: 'post',
+    url: 'http://localhost:3000/api/v1/oauth/token',
+    headers: { Authorization: `Basic ${basic}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials&scope=products%3Aread+products%3Awrite'
+  };
+
+  const result = intercept(request);
+  const params = new URLSearchParams(result.body);
+
+  assert.equal(params.get('grant_type'), 'client_credentials');
+  assert.equal(params.get('scope'), 'products:read products:write');
+  assert.equal(params.get('client_id'), 'cms-admin');
+  assert.equal(params.get('client_secret'), 's3cr3t:with:colons');
+  assert.equal(result.headers.Authorization, undefined);
+  assert.equal(result.headers['Content-Type'], 'application/x-www-form-urlencoded');
+});
+
+test('Swagger UI interceptor leaves every other request untouched', () => {
+  const intercept = require('../src/config/swagger-ui').swaggerOptions.requestInterceptor;
+  const bearer = {
+    method: 'GET',
+    url: 'http://localhost:3000/api/v1/products',
+    headers: { Authorization: 'Bearer abc' },
+    body: undefined
+  };
+  const otherBasic = {
+    method: 'POST',
+    url: 'http://localhost:3000/api/v1/products',
+    headers: { Authorization: `Basic ${Buffer.from('a:b').toString('base64')}` },
+    body: 'x=1'
+  };
+
+  assert.deepEqual(intercept({ ...bearer, headers: { ...bearer.headers } }), bearer);
+  assert.equal(intercept({ ...otherBasic, headers: { ...otherBasic.headers } }).headers.Authorization, otherBasic.headers.Authorization);
 });

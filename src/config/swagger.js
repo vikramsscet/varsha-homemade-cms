@@ -15,7 +15,9 @@ const options = {
       { name: 'Products' },
       { name: 'Product Images' },
       { name: 'Health' },
-      { name: 'OAuth' }
+      { name: 'OAuth' },
+      { name: 'Cart' },
+      { name: 'Users' }
     ],
     components: {
       securitySchemes: {
@@ -23,14 +25,20 @@ const options = {
           type: 'oauth2',
           flows: {
             clientCredentials: {
-              tokenUrl: '/oauth/token',
+              tokenUrl: '/api/v1/oauth/token',
               scopes: {
                 'products:read': 'Read products and product images',
                 'products:write': 'Create or update products and upload product images',
                 'products:delete': 'Delete products and product images',
                 'categories:read': 'Read categories',
                 'categories:write': 'Create or update categories',
-                'categories:delete': 'Delete categories'
+                'categories:delete': 'Delete categories',
+                'users:read': 'List and read customer accounts',
+                'users:write': 'Update customer accounts',
+                'users:delete': 'Delete customer accounts',
+                'carts:read': 'Read customer carts',
+                'carts:write': 'Create or update customer carts',
+                'carts:delete': 'Delete customer carts'
               }
             }
           }
@@ -145,6 +153,63 @@ const options = {
             title: { type: 'string' },
             subtitle: { type: 'string', nullable: true },
             images: { type: 'array', items: { $ref: '#/components/schemas/GalleryImage' } }
+          }
+        },
+        UserProfile: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email', example: 'customer@example.com' },
+            firstName: { type: 'string', nullable: true },
+            lastName: { type: 'string', nullable: true },
+            displayName: { type: 'string', nullable: true },
+            profileImageUrl: { type: 'string', format: 'uri', nullable: true },
+            emailVerified: { type: 'boolean' },
+            status: { type: 'string', enum: ['ACTIVE', 'SUSPENDED', 'DELETED'], example: 'ACTIVE' },
+            lastLoginAt: { type: 'string', format: 'date-time', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' }
+          }
+        },
+        CartItemProductStatus: {
+          type: 'object',
+          nullable: true,
+          description: 'Current catalog state of the product, null when the product no longer exists',
+          properties: {
+            status: { $ref: '#/components/schemas/ProductStatus' },
+            isAvailable: { type: 'boolean' },
+            isPublished: { type: 'boolean' }
+          }
+        },
+        CartItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            productId: { type: 'string', format: 'uuid' },
+            productName: { type: 'string', example: 'Besan Ladoo' },
+            productSlug: { type: 'string', example: 'besan-ladoo' },
+            unitPrice: { type: 'number', format: 'double', example: 500 },
+            quantity: { type: 'integer', example: 2 },
+            totalPrice: { type: 'number', format: 'double', example: 1000 },
+            product: { $ref: '#/components/schemas/CartItemProductStatus' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' }
+          }
+        },
+        Cart: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid', nullable: true, description: 'null when the user has no active cart yet' },
+            status: { type: 'string', enum: ['ACTIVE', 'COMPLETED', 'ABANDONED', 'EXPIRED'], example: 'ACTIVE' },
+            currency: { type: 'string', example: 'INR' },
+            subtotal: { type: 'number', format: 'double', example: 1000 },
+            discountAmount: { type: 'number', format: 'double', example: 0 },
+            taxAmount: { type: 'number', format: 'double', example: 0 },
+            totalAmount: { type: 'number', format: 'double', example: 1000 },
+            itemCount: { type: 'integer', example: 2 },
+            items: { type: 'array', items: { $ref: '#/components/schemas/CartItem' } },
+            createdAt: { type: 'string', format: 'date-time', nullable: true },
+            updatedAt: { type: 'string', format: 'date-time', nullable: true }
           }
         },
         Pagination: {

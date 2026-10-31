@@ -92,3 +92,64 @@ enum ProductStatus {
   UNPUBLISHED
   ARCHIVED
 }
+
+// The users, carts, and cart_items tables already exist in the shared database.
+// They are owned and migrated by the user-and-cart-service (raw SQL migrations
+// tracked in its schema_migrations table), so these models only map them for
+// querying - never create Prisma migrations for them.
+
+model User {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  googleId        String?   @unique @map("google_id") @db.VarChar(255)
+  email           String    @unique @db.VarChar(320)
+  firstName       String?   @map("first_name") @db.VarChar(255)
+  lastName        String?   @map("last_name") @db.VarChar(255)
+  displayName     String?   @map("display_name") @db.VarChar(255)
+  profileImageUrl String?   @map("profile_image_url")
+  emailVerified   Boolean   @default(false) @map("email_verified")
+  status          String    @default("ACTIVE") @db.VarChar(20)
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  carts           Cart[]
+
+  @@map("users")
+}
+
+model Cart {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String?    @map("user_id") @db.Uuid
+  anonymousId    String?    @map("anonymous_id") @db.Uuid
+  status         String     @default("ACTIVE") @db.VarChar(20)
+  currency       String     @default("INR") @db.VarChar(3)
+  subtotal       Decimal    @default(0) @db.Decimal(12, 2)
+  discountAmount Decimal    @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  taxAmount      Decimal    @default(0) @map("tax_amount") @db.Decimal(12, 2)
+  totalAmount    Decimal    @default(0) @map("total_amount") @db.Decimal(12, 2)
+  expiresAt      DateTime?  @map("expires_at") @db.Timestamptz(6)
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+  user           User?      @relation(fields: [userId], references: [id])
+  items          CartItem[]
+
+  @@index([userId])
+  @@index([anonymousId])
+  @@map("carts")
+}
+
+model CartItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cartId      String   @map("cart_id") @db.Uuid
+  productId   String   @map("product_id") @db.Uuid
+  productName String   @map("product_name") @db.VarChar(255)
+  productSlug String   @map("product_slug") @db.VarChar(255)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(12, 2)
+  quantity    Int
+  totalPrice  Decimal  @map("total_price") @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  cart        Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, productId])
+  @@map("cart_items")
+}
