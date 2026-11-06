@@ -9,6 +9,7 @@ const getUsers = async (req, res, next) => {
     });
     res.json(result);
   } catch (error) {
+    console.log('error-->', error)
     next(error);
   }
 };
