@@ -17,7 +17,8 @@ const options = {
       { name: 'Health' },
       { name: 'OAuth' },
       { name: 'Cart' },
-      { name: 'Users' }
+      { name: 'Users' },
+      { name: 'Orders' }
     ],
     components: {
       securitySchemes: {
@@ -38,7 +39,9 @@ const options = {
                 'users:delete': 'Delete customer accounts',
                 'carts:read': 'Read customer carts',
                 'carts:write': 'Create or update customer carts',
-                'carts:delete': 'Delete customer carts'
+                'carts:delete': 'Delete customer carts',
+                'orders:read': 'List and read orders across all customers',
+                'orders:user:read': 'List orders belonging to a specific registered user'
               }
             }
           }

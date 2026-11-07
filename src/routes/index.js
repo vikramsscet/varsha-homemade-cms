@@ -6,6 +6,7 @@ const productRoutes = require('../products/product.routes');
 const oauthRoutes = require('../oauth/oauth.routes');
 const cartRoutes = require('../cart/cart.routes');
 const userRoutes = require('../users/user.routes');
+const { orderRoutes, userOrderRoutes } = require('../orders/order.routes');
 
 const router = express.Router();
 
@@ -34,6 +35,9 @@ router.use(`${API_PREFIX}/oauth`, oauthRoutes);
 router.use(`${API_PREFIX}/categories`, categoryRoutes);
 router.use(`${API_PREFIX}/products`, productRoutes);
 router.use(`${API_PREFIX}/cart`, cartRoutes);
+router.use(`${API_PREFIX}/orders`, orderRoutes);
+// Before userRoutes so /users/:userId/orders is matched explicitly.
+router.use(`${API_PREFIX}/users`, userOrderRoutes);
 router.use(`${API_PREFIX}/users`, userRoutes);
 
 module.exports = router;
